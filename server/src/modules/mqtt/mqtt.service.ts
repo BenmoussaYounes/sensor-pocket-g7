@@ -42,11 +42,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
     const telemetryTopic = `sentinelle/${group}/+/telemetry`;
     const statusTopic = `sentinelle/${group}/+/status`;
+    const configuredClientId =
+      process.env.MQTT_CLIENT_ID || `serveur-${group}`;
+    const clientId = `${configuredClientId}-${process.pid}`;
 
     this.client = mqtt.connect(brokerUrl, {
       username: process.env.MQTT_USERNAME,
       password: process.env.MQTT_PASSWORD,
-      clientId: process.env.MQTT_CLIENT_ID || `serveur-${group}`,
+      clientId,
       reconnectPeriod: 5000,
     });
 
@@ -101,6 +104,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private handleMessage(topic: string, rawPayload: string): void {
+    if (topic.endsWith('/status')) {
+      this.logger.log(`Statut reçu sur ${topic} : ${rawPayload.trim()}`);
+      return;
+    }
+
     let payload: unknown;
 
     try {
@@ -124,7 +132,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.log(`Statut reçu sur ${topic} : ${rawPayload}`);
   }
 
   private isTelemetry(payload: unknown): payload is TelemetryMessage {
