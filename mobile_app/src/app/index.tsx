@@ -10,12 +10,22 @@ type Telemetry = {
   h?: number;
 };
 
+type TemperatureReading = {
+  timestamp: number;
+  value: number;
+};
+
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+const CHART_HEIGHT = 150;
+
 export default function HomeScreen() {
   const [ledOn, setLedOn] = useState(false);
   const [telemetry, setTelemetry] = useState<Telemetry>({});
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [temperatureReadings, setTemperatureReadings] = useState<TemperatureReading[]>([]);
+  const [chartWidth, setChartWidth] = useState(0);
 
   useEffect(() => {
     const socket = new WebSocket(`${API_BASE_URL.replace('http://', 'ws://')}/ws/telemetry`);
@@ -26,7 +36,16 @@ export default function HomeScreen() {
     };
     socket.onmessage = (event) => {
       try {
-        setTelemetry(JSON.parse(event.data) as Telemetry);
+        const nextTelemetry = JSON.parse(event.data) as Telemetry;
+        const timestamp = Date.now();
+
+        setTelemetry(nextTelemetry);
+        if (typeof nextTelemetry.t === 'number' && Number.isFinite(nextTelemetry.t)) {
+          setTemperatureReadings((readings) => [
+            ...readings.filter((reading) => reading.timestamp >= timestamp - TEN_MINUTES_MS),
+            { timestamp, value: nextTelemetry.t as number },
+          ]);
+        }
       } catch {
         setError('Message de télémétrie invalide');
       }
@@ -61,6 +80,34 @@ export default function HomeScreen() {
     }
   }
 
+  const now = Date.now();
+  const chartStart = now - TEN_MINUTES_MS;
+  const chartReadings = temperatureReadings.filter((reading) => reading.timestamp >= chartStart);
+  const chartPlotWidth = Math.max(chartWidth - 12, 0);
+  const chartValues = chartReadings.map((reading) => reading.value);
+  const lowestValue = chartValues.length > 0 ? Math.min(...chartValues) : 0;
+  const highestValue = chartValues.length > 0 ? Math.max(...chartValues) : 1;
+  const valuePadding = Math.max((highestValue - lowestValue) * 0.15, 0.5);
+  const chartMinimum = lowestValue - valuePadding;
+  const chartRange = highestValue - lowestValue + valuePadding * 2;
+  const chartPoints = chartReadings.map((reading) => ({
+    x: ((reading.timestamp - chartStart) / TEN_MINUTES_MS) * chartPlotWidth,
+    y: CHART_HEIGHT - ((reading.value - chartMinimum) / chartRange) * CHART_HEIGHT,
+  }));
+  const chartSegments = chartPoints.slice(1).map((point, index) => {
+    const previousPoint = chartPoints[index];
+    const length = Math.sqrt((point.x - previousPoint.x) ** 2 + (point.y - previousPoint.y) ** 2);
+    const angle = Math.atan2(point.y - previousPoint.y, point.x - previousPoint.x);
+
+    return {
+      key: `${chartReadings[index + 1].timestamp}`,
+      length,
+      left: (previousPoint.x + point.x) / 2 - length / 2,
+      top: (previousPoint.y + point.y) / 2 - 1.5,
+      angle: `${(angle * 180) / Math.PI}deg`,
+    };
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -70,6 +117,45 @@ export default function HomeScreen() {
             <Text style={styles.title}>Mon capteur</Text>
           </View>
           <View style={[styles.statusDot, connected ? styles.online : styles.offline]} />
+        </View>
+
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View>
+              <Text style={styles.cardLabel}>TEMPÉRATURE</Text>
+              <Text style={styles.chartTitle}>10 dernières minutes</Text>
+            </View>
+            <Text style={styles.chartCurrentValue}>{telemetry.t != null ? `${telemetry.t.toFixed(1)}°` : '--'}</Text>
+          </View>
+
+          <View onLayout={(event) => setChartWidth(event.nativeEvent.layout.width)} style={styles.chartArea}>
+            <View style={[styles.chartGridLine, { top: CHART_HEIGHT * 0.25 }]} />
+            <View style={[styles.chartGridLine, { top: CHART_HEIGHT * 0.5 }]} />
+            <View style={[styles.chartGridLine, { top: CHART_HEIGHT * 0.75 }]} />
+            {chartSegments.map((segment) => (
+              <View
+                key={segment.key}
+                style={[
+                  styles.chartSegment,
+                  {
+                    left: segment.left,
+                    top: segment.top,
+                    transform: [{ rotate: segment.angle }],
+                    width: segment.length,
+                  },
+                ]}
+              />
+            ))}
+            {chartPoints.length === 1 && (
+              <View style={[styles.chartPoint, { left: chartPoints[0].x - 5, top: chartPoints[0].y - 5 }]} />
+            )}
+            {chartPoints.length === 0 && <Text style={styles.chartEmpty}>En attente des mesures...</Text>}
+          </View>
+
+          <View style={styles.chartAxis}>
+            <Text style={styles.chartAxisLabel}>-10 min</Text>
+            <Text style={styles.chartAxisLabel}>Maintenant</Text>
+          </View>
         </View>
 
         <View style={styles.sensorCard}>
@@ -110,6 +196,17 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F5F7F2' },
   container: { flexGrow: 1, padding: 24, paddingBottom: 120 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 },
+  chartCard: { backgroundColor: '#FFFFFF', borderRadius: 24, marginBottom: 14, padding: 20 },
+  chartHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  chartTitle: { color: '#15251B', fontSize: 18, fontWeight: '800', marginTop: 6 },
+  chartCurrentValue: { color: '#3A9D5D', fontSize: 24, fontWeight: '800' },
+  chartArea: { height: CHART_HEIGHT, marginTop: 18, overflow: 'hidden', position: 'relative' },
+  chartGridLine: { backgroundColor: '#E8EEE8', height: 1, left: 0, position: 'absolute', right: 0 },
+  chartSegment: { backgroundColor: '#3A9D5D', borderRadius: 2, height: 3, position: 'absolute' },
+  chartPoint: { backgroundColor: '#3A9D5D', borderColor: '#FFFFFF', borderRadius: 5, borderWidth: 2, height: 10, position: 'absolute', width: 10 },
+  chartEmpty: { color: '#71806F', fontSize: 14, position: 'absolute', textAlign: 'center', top: 66, width: '100%' },
+  chartAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  chartAxisLabel: { color: '#71806F', fontSize: 11 },
   eyebrow: { color: '#71806F', fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
   title: { color: '#15251B', fontSize: 34, fontWeight: '800', marginTop: 6 },
   statusDot: { borderRadius: 12, height: 14, width: 14 },
