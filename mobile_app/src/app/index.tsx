@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-const DEVICE_ID = process.env.EXPO_PUBLIC_DEVICE_ID;
+const API_BASE_URL = 'http://31.207.35.155:110';
+const DEVICE_ID = 'esp-01';
 
 type Telemetry = {
   t?: number;
@@ -28,11 +28,6 @@ export default function HomeScreen() {
   const [chartWidth, setChartWidth] = useState(0);
 
   useEffect(() => {
-    if (!API_BASE_URL || !DEVICE_ID) {
-      setError('Configuration API manquante');
-      return;
-    }
-
     const socket = new WebSocket(`${API_BASE_URL.replace('http://', 'ws://')}/ws/telemetry`);
 
     socket.onopen = () => {
@@ -62,11 +57,6 @@ export default function HomeScreen() {
   }, []);
 
   async function toggleLed() {
-    if (!API_BASE_URL || !DEVICE_ID) {
-      setError('Configuration API manquante');
-      return;
-    }
-
     const nextState = !ledOn;
     setLoading(true);
     setError(null);
