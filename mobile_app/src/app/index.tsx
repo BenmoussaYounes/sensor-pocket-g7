@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_BASE_URL = 'http://10.120.132.228:3000';
+const API_BASE_URL = 'http://31.207.35.155:110';
 const DEVICE_ID = 'esp-01';
 
 type Telemetry = {
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   ledOn: { color: '#3A9D5D' },
   ledOff: { color: '#71806F' },
   error: { color: '#B23A48', fontSize: 14, marginTop: 20, textAlign: 'center' },
-  fab: { alignItems: 'center', backgroundColor: '#15251B', borderRadius: 32, bottom: 28, elevation: 6, height: 64, justifyContent: 'center', position: 'absolute', right: 24, shadowColor: '#15251B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, width: 64 },
+  fab: { alignItems: 'center', backgroundColor: '#15251B', borderRadius: 32, bottom: 72, elevation: 6, height: 64, justifyContent: 'center', position: 'absolute', right: 24, shadowColor: '#15251B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, width: 64 },
   fabPressed: { opacity: 0.75 },
   fabText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
 });
