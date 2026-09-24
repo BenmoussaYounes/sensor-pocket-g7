@@ -8,7 +8,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSensorStore } from "../stores/useSensorStore";
+import { Link } from "expo-router";
+import { useSensorStore } from "../store/useSensorStore";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const CHART_HEIGHT = 150;
@@ -32,7 +33,6 @@ export default function HomeScreen() {
     return () => disconnect();
   }, [initSocketConnection]);
 
-  // Calculs du graphique
   const now = Date.now();
   const chartStart = now - TEN_MINUTES_MS;
   const chartReadings = temperatureReadings.filter(
@@ -80,12 +80,19 @@ export default function HomeScreen() {
             <Text style={styles.eyebrow}>SERVEUR G7</Text>
             <Text style={styles.title}>Mon capteur</Text>
           </View>
-          <View
-            style={[
-              styles.statusDot,
-              connected ? styles.online : styles.offline,
-            ]}
-          />
+          <View style={styles.headerRight}>
+            <Link href="/history" asChild>
+              <Pressable style={styles.historyBtn}>
+                <Text style={styles.historyBtnText}>📊 Historique</Text>
+              </Pressable>
+            </Link>
+            <View
+              style={[
+                styles.statusDot,
+                connected ? styles.online : styles.offline,
+              ]}
+            />
+          </View>
         </View>
 
         <View style={styles.chartCard}>
@@ -201,6 +208,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 36,
   },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  historyBtn: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  historyBtnText: { color: "#15251B", fontWeight: "700", fontSize: 13 },
   chartCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,

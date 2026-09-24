@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { connectTelemetrySocket, Telemetry } from "../api/telemetrySocket";
 import { setLedState } from "../api/ledApi";
+import {
+  fetchMeasurementHistory,
+  HistoricalMeasurement,
+} from "../api/telemetryApi";
 
 export type TemperatureReading = {
   timestamp: number;
@@ -14,12 +18,15 @@ interface SensorState {
   telemetry: Telemetry;
   connected: boolean;
   loading: boolean;
+  historyLoading: boolean;
   error: string | null;
   temperatureReadings: TemperatureReading[];
+  history: HistoricalMeasurement[];
 
   // Actions
   initSocketConnection: () => () => void;
   toggleLed: () => Promise<void>;
+  loadHistory: (fromTs: number, toTs: number) => Promise<void>;
   setError: (error: string | null) => void;
 }
 
@@ -28,8 +35,10 @@ export const useSensorStore = create<SensorState>((set, get) => ({
   telemetry: {},
   connected: false,
   loading: false,
+  historyLoading: false,
   error: null,
   temperatureReadings: [],
+  history: [],
 
   setError: (error) => set({ error }),
 
@@ -71,6 +80,18 @@ export const useSensorStore = create<SensorState>((set, get) => ({
       set({ error: err.message || "Impossible de modifier la LED" });
     } finally {
       set({ loading: false });
+    }
+  },
+
+  loadHistory: async (fromTs: number, toTs: number) => {
+    set({ historyLoading: true, error: null });
+    try {
+      const data = await fetchMeasurementHistory(fromTs, toTs);
+      set({ history: data });
+    } catch (err: any) {
+      set({ error: err.message || "Erreur chargement historique" });
+    } finally {
+      set({ historyLoading: false });
     }
   },
 }));
