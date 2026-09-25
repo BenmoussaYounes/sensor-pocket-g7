@@ -75,6 +75,46 @@ recevoir chaque mesure MQTT valide en temps réel. Les messages ont ce format :
 }
 ```
 
+Le même WebSocket envoie aussi les changements d'état d'alerte. Le mobile peut
+afficher une notification locale quand il reçoit `alert_started`, puis la fermer
+quand il reçoit `alert_stopped`.
+
+Début d'alerte :
+
+```json
+{
+  "event": "alert_started",
+  "data": {
+    "deviceId": "esp-01",
+    "type": "temperature_or_humidity_threshold",
+    "holdMinutes": 15,
+    "thresholds": {
+      "tMin": 2,
+      "tMax": 8,
+      "hMin": 30,
+      "hMax": 60
+    }
+  }
+}
+```
+
+Fin d'alerte après le retour à la normale :
+
+```json
+{
+  "event": "alert_stopped",
+  "data": {
+    "deviceId": "esp-01",
+    "reason": "threshold_normalized"
+  }
+}
+```
+
+Ce WebSocket permet une notification lorsque l'application est connectée. Pour
+une notification système lorsque l'application est fermée ou en arrière-plan,
+il faudra ensuite ajouter un fournisseur push comme Firebase Cloud Messaging
+ou Apple Push Notification service.
+
 ## Compile and run the project
 
 ```bash
