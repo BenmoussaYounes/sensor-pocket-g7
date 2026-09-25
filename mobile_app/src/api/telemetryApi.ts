@@ -1,4 +1,4 @@
-import { API_BASE_URL, DEVICE_ID, checkConfig } from "./config";
+import { API_BASE_URL, checkConfig } from "./config";
 
 export type HistoricalMeasurement = {
   id: number;
@@ -10,21 +10,24 @@ export type HistoricalMeasurement = {
   h: number | null;
 };
 
+/** GET /devices/:deviceId/measurements — historique d'un frigo précis. */
 export async function fetchMeasurementHistory(
+  deviceId: string,
   fromTs: number,
   toTs: number,
   limit = 100,
 ): Promise<HistoricalMeasurement[]> {
   checkConfig();
 
-  // On envoie 'from' et 'to' en Query Params
+  // On envoie 'from', 'to' et 'limit' en Query Params.
   const params = new URLSearchParams({
     from: fromTs.toString(),
     to: toTs.toString(),
+    limit: limit.toString(),
   });
 
   const response = await fetch(
-    `${API_BASE_URL}/devices/${DEVICE_ID}/measurements?${params}`,
+    `${API_BASE_URL}/devices/${deviceId}/measurements?${params}`,
   );
 
   if (!response.ok) {

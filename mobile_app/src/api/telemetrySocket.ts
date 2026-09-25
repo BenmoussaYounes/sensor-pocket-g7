@@ -1,6 +1,13 @@
 import { API_BASE_URL, checkConfig } from "./config";
 
+// Le serveur diffuse maintenant la télémétrie de TOUS les frigos sur la même
+// connexion WebSocket (un seul flux global) : chaque message porte désormais
+// son deviceId, à charge pour le consommateur (le store) de trier.
 export type Telemetry = {
+  deviceId?: string;
+  topic?: string;
+  ts?: number;
+  seq?: number;
   t?: number;
   h?: number;
 };
@@ -21,7 +28,7 @@ export function connectTelemetrySocket(callbacks: SocketCallbacks) {
   try {
     checkConfig();
   } catch (err: any) {
-    // Erreur de configuration (URL/API manquante) : pas la peine de boucler,
+    // Erreur de configuration (URL API manquante) : pas la peine de boucler,
     // ça ne se réparera pas tout seul.
     callbacks.onError(err.message);
     return () => {};
