@@ -55,6 +55,13 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
           -- mélangées sur la plage de dates).
           CREATE INDEX IF NOT EXISTS idx_measurements_device_ts
             ON measurements (device, ts);
+
+          CREATE TABLE IF NOT EXISTS devices (
+            id            TEXT PRIMARY KEY,
+            groupe        TEXT NOT NULL,
+            status        TEXT NOT NULL,
+            last_activity INTEGER NOT NULL
+          );
         `);
 
         logger.log(`Base SQLite prête (${dbPath})`);
