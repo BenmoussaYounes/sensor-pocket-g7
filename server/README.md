@@ -46,6 +46,19 @@ Les statuts peuvent être envoyés sur `sentinelle/<MQTT_GROUP>/<device>/status`
 avec `{ "status": "online" }` ou comme texte simple (`online`). L'état courant
 est consultable via `GET /devices` et `GET /devices/{deviceId}`.
 
+## Cas d’usage : groupe frigo
+
+Pour un groupe `frigo`, les seuils doivent refléter un stockage réfrigéré :
+
+- `tMin` autour de `2` °C
+- `tMax` autour de `8` °C
+- `hMin` autour de `30` %
+- `hMax` autour de `60` %
+- `holdMinutes` autour de `15` minutes
+
+Ce profil correspond à une zone de conservation froide où l’on veut éviter les faux
+positifs tout en détectant une dérive significative de température ou d’humidité.
+
 ## WebSocket télémétrie
 
 Connectez un client WebSocket à `ws://localhost:3000/ws/telemetry` pour
