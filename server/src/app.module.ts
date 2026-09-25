@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AlertsModule } from './modules/alerts/alerts.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { EventsModule } from './modules/events/events.module';
@@ -16,6 +17,7 @@ import { ThresholdsModule } from './modules/thresholds/thresholds.module';
     MqttModule,
     DevicesModule,
     EventsModule,
+    AlertsModule,
     LedModule,
     TelemetryModule,
     MeasurementsModule,
