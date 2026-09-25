@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -14,6 +15,12 @@ import { ThresholdInput, ThresholdsService } from './thresholds.service';
 @Controller('devices')
 export class ThresholdsController {
   constructor(private readonly thresholdsService: ThresholdsService) {}
+
+  @Get('thresholds')
+  @ApiOperation({ summary: 'Liste tous les seuils d’alerte' })
+  getAllThresholds() {
+    return this.thresholdsService.findAll();
+  }
 
   @Get(':deviceId/thresholds')
   @ApiOperation({ summary: "Seuils d’alerte d’un device" })
@@ -48,6 +55,17 @@ export class ThresholdsController {
   ) {
     const payload = this.validatePayload(body);
     return this.thresholdsService.upsertForDevice(deviceId, payload);
+  }
+
+  @Delete(':deviceId/thresholds')
+  @ApiOperation({ summary: 'Supprimer les seuils d’un device' })
+  @ApiParam({ name: 'deviceId', description: 'Identifiant du device' })
+  deleteThresholds(@Param('deviceId') deviceId: string) {
+    const deleted = this.thresholdsService.deleteForDevice(deviceId);
+    if (!deleted) {
+      throw new NotFoundException(`Aucun seuil défini pour ${deviceId}`);
+    }
+    return { deviceId, deleted: true };
   }
 
   private validatePayload(body: Record<string, unknown>): ThresholdInput {
