@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LineChart } from "react-native-chart-kit";
+import Svg, { Line, Path } from "react-native-svg";
 import { useSensorStore } from "../store/useSensorStore";
 import { HistoricalMeasurement } from "../api/telemetryApi";
 
@@ -24,18 +25,95 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 // l'écran sans scroll horizontal.
 const MIN_POINT_SPACING = 24;
 
+// Palette "frigo" : bleu givre pour la température, bleu-vert pour l'humidité.
+const COLORS = {
+  bg: "#EAF1F7",
+  card: "#FFFFFF",
+  border: "#DCE7EF",
+  textDark: "#132433",
+  textMuted: "#66788C",
+  cold: "#2E86D6",
+  humidity: "#0E9DA8",
+  danger: "#D64545",
+  segmentBg: "#E1EAF1",
+};
+
 const METRIC_LABEL: Record<Metric, string> = {
   t: "Température (°C)",
   h: "Humidité (%)",
 };
 const METRIC_COLOR: Record<Metric, string> = {
-  t: "#3A9D5D",
-  h: "#3A7FBF",
+  t: COLORS.cold,
+  h: COLORS.humidity,
 };
 const METRIC_SUFFIX: Record<Metric, string> = {
   t: "°C",
   h: "%",
 };
+
+/* ------------------------------- Icônes SVG ------------------------------ */
+
+function IconChevronLeft({ size = 18, color = COLORS.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M15 5.5 8.5 12l6.5 6.5"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function IconThermometer({ size = 14, color = COLORS.cold }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M10 13.6V5a2 2 0 1 1 4 0v8.6a4.2 4.2 0 1 1-4 0Z"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function IconDroplet({ size = 14, color = COLORS.humidity }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3c3.2 4.1 6.2 7.7 6.2 11.2A6.2 6.2 0 1 1 5.8 14.2C5.8 10.7 8.8 7.1 12 3Z"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function IconChartBars({ size = 14, color = COLORS.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 20V10" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M10.5 20V4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M17 20v-7" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconList({ size = 14, color = COLORS.textDark }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Line x1="4" y1="6" x2="20" y2="6" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="4" y1="12" x2="20" y2="12" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="4" y1="18" x2="20" y2="18" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/* --------------------------------- Écran --------------------------------- */
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -93,18 +171,24 @@ export default function HistoryScreen() {
           <Text style={styles.seq}>#{item.id}</Text>
         </View>
         <View style={styles.valuesRow}>
-          <Text style={styles.value}>
-            Temp :{" "}
-            <Text style={styles.bold}>
-              {item.t != null ? `${item.t.toFixed(1)}°C` : "--"}
+          <View style={styles.rowCenter}>
+            <IconThermometer size={13} />
+            <Text style={styles.value}>
+              {"  "}
+              <Text style={[styles.bold, { color: COLORS.cold }]}>
+                {item.t != null ? `${item.t.toFixed(1)}°C` : "--"}
+              </Text>
             </Text>
-          </Text>
-          <Text style={styles.value}>
-            Humidité :{" "}
-            <Text style={styles.bold}>
-              {item.h != null ? `${item.h.toFixed(1)}%` : "--"}
+          </View>
+          <View style={styles.rowCenter}>
+            <IconDroplet size={13} />
+            <Text style={styles.value}>
+              {"  "}
+              <Text style={[styles.bold, { color: COLORS.humidity }]}>
+                {item.h != null ? `${item.h.toFixed(1)}%` : "--"}
+              </Text>
             </Text>
-          </Text>
+          </View>
         </View>
       </View>
     );
@@ -114,7 +198,8 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Retour</Text>
+          <IconChevronLeft />
+          <Text style={styles.backText}>Retour</Text>
         </Pressable>
         <Text style={styles.title}>Historique</Text>
       </View>
@@ -122,8 +207,8 @@ export default function HistoryScreen() {
       <View style={styles.toggleRow}>
         <Segmented
           options={[
-            { value: "chart", label: "Graphique" },
-            { value: "list", label: "Liste" },
+            { value: "chart", label: "Graphique", icon: <IconChartBars /> },
+            { value: "list", label: "Liste", icon: <IconList /> },
           ]}
           value={viewMode}
           onChange={(v) => setViewMode(v as ViewMode)}
@@ -131,8 +216,8 @@ export default function HistoryScreen() {
         {viewMode === "chart" && (
           <Segmented
             options={[
-              { value: "t", label: "Température" },
-              { value: "h", label: "Humidité" },
+              { value: "t", label: "Température", icon: <IconThermometer /> },
+              { value: "h", label: "Humidité", icon: <IconDroplet /> },
             ]}
             value={metric}
             onChange={(v) => setMetric(v as Metric)}
@@ -144,7 +229,7 @@ export default function HistoryScreen() {
         <ActivityIndicator
           style={{ marginTop: 40 }}
           size="large"
-          color="#15251B"
+          color={COLORS.textDark}
         />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
@@ -174,21 +259,24 @@ export default function HistoryScreen() {
               withInnerLines={false}
               bezier
               chartConfig={{
-                backgroundGradientFrom: "#FFFFFF",
-                backgroundGradientTo: "#FFFFFF",
+                backgroundGradientFrom: COLORS.card,
+                backgroundGradientTo: COLORS.card,
                 decimalPlaces: 1,
                 color: () => METRIC_COLOR[metric],
-                labelColor: () => "#71806F",
+                labelColor: () => COLORS.textMuted,
                 propsForDots: { r: "3" },
-                propsForBackgroundLines: { stroke: "#EDEFEA" },
+                propsForBackgroundLines: { stroke: COLORS.border },
               }}
               style={styles.chart}
             />
           </ScrollView>
-          <Text style={styles.chartCaption}>
-            {chartPoints.length} point{chartPoints.length > 1 ? "s" : ""} —{" "}
-            {METRIC_LABEL[metric]}
-          </Text>
+          <View style={styles.rowCenter}>
+            {metric === "t" ? <IconThermometer size={12} /> : <IconDroplet size={12} />}
+            <Text style={[styles.chartCaption, { marginLeft: 6 }]}>
+              {chartPoints.length} point{chartPoints.length > 1 ? "s" : ""} —{" "}
+              {METRIC_LABEL[metric]}
+            </Text>
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -200,7 +288,7 @@ function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: React.ReactNode }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -214,8 +302,13 @@ function Segmented<T extends string>({
             onPress={() => onChange(opt.value)}
             style={[styles.segment, active && styles.segmentActive]}
           >
+            {opt.icon}
             <Text
-              style={[styles.segmentText, active && styles.segmentTextActive]}
+              style={[
+                styles.segmentText,
+                active && styles.segmentTextActive,
+                opt.icon ? { marginLeft: 6 } : null,
+              ]}
             >
               {opt.label}
             </Text>
@@ -227,16 +320,22 @@ function Segmented<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F5F7F2" },
+  safeArea: { flex: 1, backgroundColor: COLORS.bg },
   header: { flexDirection: "row", alignItems: "center", padding: 20, gap: 16 },
+  rowCenter: { alignItems: "center", flexDirection: "row" },
   backBtn: {
-    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
   },
-  backText: { color: "#15251B", fontWeight: "700" },
-  title: { fontSize: 24, fontWeight: "800", color: "#15251B" },
+  backText: { color: COLORS.textDark, fontWeight: "700" },
+  title: { fontSize: 22, fontWeight: "800", color: COLORS.textDark },
   toggleRow: {
     paddingHorizontal: 20,
     gap: 10,
@@ -244,40 +343,51 @@ const styles = StyleSheet.create({
   },
   segmented: {
     flexDirection: "row",
-    backgroundColor: "#E7EBE3",
+    backgroundColor: COLORS.segmentBg,
     borderRadius: 12,
     padding: 4,
     gap: 4,
   },
   segment: {
+    alignItems: "center",
     flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
     paddingVertical: 8,
     borderRadius: 9,
-    alignItems: "center",
   },
-  segmentActive: { backgroundColor: "#FFFFFF" },
-  segmentText: { color: "#71806F", fontWeight: "600", fontSize: 13 },
-  segmentTextActive: { color: "#15251B" },
+  segmentActive: {
+    backgroundColor: COLORS.card,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  segmentText: { color: COLORS.textMuted, fontWeight: "600", fontSize: 13 },
+  segmentTextActive: { color: COLORS.textDark },
   list: { padding: 20 },
   card: {
-    backgroundColor: "#FFFFFF",
-    padding: 16,
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.border,
     borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 12,
+    padding: 16,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  time: { color: "#71806F", fontSize: 13, fontWeight: "600" },
-  seq: { color: "#A0ACA0", fontSize: 12 },
+  time: { color: COLORS.textMuted, fontSize: 13, fontWeight: "600" },
+  seq: { color: "#9AA9B8", fontSize: 12 },
   valuesRow: { flexDirection: "row", justifyContent: "space-between" },
-  value: { fontSize: 15, color: "#15251B" },
-  bold: { fontWeight: "700", color: "#3A9D5D" },
-  error: { color: "#B23A48", textAlign: "center", marginTop: 20 },
-  empty: { textAlign: "center", color: "#71806F", marginTop: 40 },
+  value: { fontSize: 15, color: COLORS.textDark },
+  bold: { fontWeight: "700" },
+  error: { color: COLORS.danger, textAlign: "center", marginTop: 20 },
+  empty: { textAlign: "center", color: COLORS.textMuted, marginTop: 40 },
   chartContainer: { padding: 20, alignItems: "center" },
   chart: { borderRadius: 16 },
-  chartCaption: { color: "#71806F", fontSize: 12, marginTop: 8 },
+  chartCaption: { color: COLORS.textMuted, fontSize: 12, marginTop: 8 },
 });
