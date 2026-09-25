@@ -30,3 +30,17 @@ export function formatRelativeTime(timestampMs: number | null | undefined): stri
   const diffDay = Math.floor(diffHour / 24);
   return `il y a ${diffDay} j`;
 }
+
+/**
+ * Traduit le "type" technique d'une alerte backend en libellé lisible.
+ * Les types non reconnus sont affichés tels quels plutôt que masqués, pour
+ * qu'une nouvelle alerte encore inconnue de l'app reste visible.
+ */
+export function formatAlertType(type: string): string {
+  switch (type) {
+    case "temperature_or_humidity_threshold":
+      return "Seuil de température ou d'humidité dépassé";
+    default:
+      return type;
+  }
+}

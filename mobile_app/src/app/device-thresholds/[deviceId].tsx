@@ -18,6 +18,7 @@ import {
   IconThermometer,
 } from "../../components/fridge-icons";
 import { useSensorStore } from "../../store/useSensorStore";
+import { DeviceSelector } from "../../components/device-selector";
 
 // Valeurs par défaut suggérées pour un frigo tant qu'aucun seuil n'a été
 // configuré côté serveur (conservation froide classique).
@@ -113,8 +114,8 @@ export default function DeviceThresholdsScreen() {
           <IconChevronLeft />
           <Text style={styles.backText}>Retour</Text>
         </Pressable>
-        <View>
-          <Text style={styles.eyebrow}>{deviceId}</Text>
+        <View style={{ flex: 1 }}>
+          <DeviceSelector deviceId={deviceId} route="/device-thresholds/[deviceId]" />
           <Text style={styles.title}>Seuils d'alerte</Text>
         </View>
       </View>

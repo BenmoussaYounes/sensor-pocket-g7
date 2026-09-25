@@ -29,6 +29,7 @@ export default function DashboardScreen() {
     devicesLoading,
     devicesError,
     telemetryByDevice,
+    activeAlertsByDevice,
     connected,
     loadDevices,
   } = useSensorStore();
@@ -117,6 +118,7 @@ export default function DashboardScreen() {
         {devices.map((device) => {
           const telemetry = telemetryByDevice[device.id];
           const isOnline = device.status === "online";
+          const hasActiveAlert = Boolean(activeAlertsByDevice[device.id]);
 
           return (
             <Link
@@ -137,16 +139,23 @@ export default function DashboardScreen() {
                     <Text style={styles.deviceGroup}>{device.groupe}</Text>
                     <Text style={styles.deviceName}>{device.id}</Text>
                   </View>
-                  <View style={styles.statusPill}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        isOnline ? styles.online : styles.offline,
-                      ]}
-                    />
-                    <Text style={styles.statusText}>
-                      {isOnline ? "En ligne" : "Hors ligne"}
-                    </Text>
+                  <View style={{ alignItems: "flex-end", gap: 6 }}>
+                    <View style={styles.statusPill}>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          isOnline ? styles.online : styles.offline,
+                        ]}
+                      />
+                      <Text style={styles.statusText}>
+                        {isOnline ? "En ligne" : "Hors ligne"}
+                      </Text>
+                    </View>
+                    {hasActiveAlert && (
+                      <View style={styles.alertPill}>
+                        <Text style={styles.alertPillText}>⚠ Alerte</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
@@ -220,6 +229,13 @@ const styles = StyleSheet.create({
   online: { backgroundColor: COLORS.online },
   offline: { backgroundColor: COLORS.offline },
   statusText: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
+  alertPill: {
+    backgroundColor: "#FDECEC",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  alertPillText: { color: COLORS.danger, fontSize: 11, fontWeight: "700" },
   error: { color: COLORS.danger, fontSize: 14, marginTop: 30, textAlign: "center" },
   empty: { color: COLORS.textMuted, fontSize: 14, marginTop: 30, textAlign: "center" },
   deviceCard: {
