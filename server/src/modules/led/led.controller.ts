@@ -15,13 +15,17 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { EventsService } from '../events/events.service';
 import { MqttService } from '../mqtt/mqtt.service';
 import { SetLedDto } from './dto/set-led.dto';
 
 @ApiTags('LED')
 @Controller('devices')
 export class LedController {
-  constructor(private readonly mqttService: MqttService) {}
+  constructor(
+    private readonly mqttService: MqttService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   @Post(':deviceId/led')
   @ApiOperation({ summary: 'Allumer ou éteindre la LED d’un device' })
@@ -45,6 +49,12 @@ export class LedController {
 
     try {
       const result = this.mqttService.setLed(deviceId, body.on);
+      this.eventsService.record(deviceId, 'led_command', {
+        deviceId,
+        on: body.on,
+        topic: result.topic,
+        payload: result.payload,
+      });
       return { deviceId, on: body.on, ...result };
     } catch (error) {
       throw new ServiceUnavailableException(

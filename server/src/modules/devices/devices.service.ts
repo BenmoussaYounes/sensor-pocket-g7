@@ -1,6 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { Database, Statement } from 'better-sqlite3';
 import { SQLITE_CONNECTION } from '../database/database.module';
+import { EventsService } from '../events/events.service';
 import {
   DeviceStatusMessage,
   MqttService,
@@ -21,6 +22,7 @@ export class DevicesService implements OnModuleInit {
   constructor(
     @Inject(SQLITE_CONNECTION) private readonly db: Database,
     private readonly mqttService: MqttService,
+    private readonly eventsService: EventsService,
   ) {
     this.upsertStatement = this.db.prepare(`
       INSERT INTO devices (id, groupe, status, last_activity)
@@ -50,9 +52,17 @@ export class DevicesService implements OnModuleInit {
 
   refreshFromTelemetry(
     topicParts: { groupe: string; deviceId: string },
-    _telemetry: TelemetryMessage,
+    telemetry: TelemetryMessage,
   ): void {
     this.upsert(topicParts.groupe, topicParts.deviceId, 'online');
+    this.eventsService.record(topicParts.deviceId, 'telemetry_received', {
+      groupe: topicParts.groupe,
+      deviceId: topicParts.deviceId,
+      ts: telemetry.ts,
+      t: telemetry.t,
+      h: telemetry.h,
+      seq: telemetry.seq,
+    });
   }
 
   refreshFromStatus(
@@ -60,6 +70,11 @@ export class DevicesService implements OnModuleInit {
     status: DeviceStatusMessage,
   ): void {
     this.upsert(topicParts.groupe, topicParts.deviceId, status.status);
+    this.eventsService.record(topicParts.deviceId, 'device_status', {
+      groupe: topicParts.groupe,
+      deviceId: topicParts.deviceId,
+      status: status.status,
+    });
   }
 
   findAll(): DeviceRow[] {
