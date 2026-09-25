@@ -12,9 +12,32 @@ export type Telemetry = {
   h?: number;
 };
 
+// Le backend diffuse aussi des évènements d'alerte sur le même flux, sous
+// forme d'enveloppe { event, data } — bien distincte des messages de
+// télémétrie brute (qui n'ont pas de champ "event").
+export type AlertStartedEvent = {
+  event: "alert_started";
+  data: {
+    deviceId: string;
+    type: string;
+    holdMinutes: number;
+  };
+};
+
+export type AlertStoppedEvent = {
+  event: "alert_stopped";
+  data: {
+    deviceId: string;
+    reason: string;
+  };
+};
+
+export type AlertEvent = AlertStartedEvent | AlertStoppedEvent;
+
 type SocketCallbacks = {
   onOpen: () => void;
   onMessage: (data: Telemetry) => void;
+  onAlert: (alert: AlertEvent) => void;
   onError: (error: string) => void;
   onClose: () => void;
 };
@@ -73,8 +96,16 @@ export function connectTelemetrySocket(callbacks: SocketCallbacks) {
 
     socket.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data) as Telemetry;
-        callbacks.onMessage(data);
+        const parsed = JSON.parse(event.data);
+
+        // Une enveloppe d'alerte porte un champ "event" ("alert_started" /
+        // "alert_stopped") ; la télémétrie brute n'en a pas. C'est ce qui
+        // permet de trier sur la même connexion sans changer d'endpoint.
+        if (parsed && (parsed.event === "alert_started" || parsed.event === "alert_stopped")) {
+          callbacks.onAlert(parsed as AlertEvent);
+        } else {
+          callbacks.onMessage(parsed as Telemetry);
+        }
       } catch {
         callbacks.onError("Message de télémétrie invalide");
       }

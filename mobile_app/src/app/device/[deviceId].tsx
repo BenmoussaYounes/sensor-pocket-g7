@@ -27,8 +27,9 @@ import {
   IconThermometer,
 } from "../../components/fridge-icons";
 import { useSensorStore } from "../../store/useSensorStore";
+import { DeviceSelector } from "../../components/device-selector";
 import { fetchDevice, DeviceSummary } from "../../api/devicesApi";
-import { formatRelativeTime } from "../../utils/format";
+import { formatAlertType, formatRelativeTime } from "../../utils/format";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const CHART_HEIGHT = 150;
@@ -43,6 +44,7 @@ export default function DeviceDetailScreen() {
     readingsByDevice,
     ledByDevice,
     ledLoadingByDevice,
+    activeAlertsByDevice,
     connected,
     error,
     toggleLed,
@@ -72,6 +74,7 @@ export default function DeviceDetailScreen() {
 
   const device = knownDevice ?? fallbackDevice;
   const telemetry = telemetryByDevice[deviceId] ?? {};
+  const activeAlert = activeAlertsByDevice[deviceId];
   const ledOn = ledByDevice[deviceId] ?? false;
   const ledLoading = ledLoadingByDevice[deviceId] ?? false;
 
@@ -96,7 +99,10 @@ export default function DeviceDetailScreen() {
   }));
 
   const linePath = chartPoints
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .map(
+      (point, index) =>
+        `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
+    )
     .join(" ");
 
   const areaPath =
@@ -111,14 +117,8 @@ export default function DeviceDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <IconChevronLeft />
-          </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>
-              {device?.groupe ?? "FRIGO"}
-            </Text>
-            <Text style={styles.title}>{deviceId}</Text>
+            <DeviceSelector deviceId={deviceId} route="/device/[deviceId]" />
           </View>
           <View style={styles.statusPill}>
             <View
@@ -140,6 +140,18 @@ export default function DeviceDetailScreen() {
 
         {fallbackError && !device && (
           <Text style={styles.error}>{fallbackError}</Text>
+        )}
+
+        {activeAlert && (
+          <View style={styles.alertBanner}>
+            <Text style={styles.alertBannerTitle}>
+              ⚠ {formatAlertType(activeAlert.type)}
+            </Text>
+            <Text style={styles.alertBannerSubtitle}>
+              En cours depuis {formatRelativeTime(activeAlert.startedAt)} ·
+              seuil maintenu {activeAlert.holdMinutes} min avant déclenchement
+            </Text>
+          </View>
         )}
 
         <View style={styles.navRow}>
@@ -188,24 +200,72 @@ export default function DeviceDetailScreen() {
             style={styles.chartArea}
           >
             {chartPlotWidth > 0 && (
-              <Svg width={chartPlotWidth} height={CHART_HEIGHT} style={styles.chartSvg}>
+              <Svg
+                width={chartPlotWidth}
+                height={CHART_HEIGHT}
+                style={styles.chartSvg}
+              >
                 <Defs>
                   <LinearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0" stopColor={COLORS.cold} stopOpacity={0.28} />
+                    <Stop
+                      offset="0"
+                      stopColor={COLORS.cold}
+                      stopOpacity={0.28}
+                    />
                     <Stop offset="1" stopColor={COLORS.cold} stopOpacity={0} />
                   </LinearGradient>
                 </Defs>
 
-                <Line x1="0" y1={CHART_HEIGHT * 0.25} x2={chartPlotWidth} y2={CHART_HEIGHT * 0.25} stroke={COLORS.border} strokeWidth={1} strokeDasharray="4 5" />
-                <Line x1="0" y1={CHART_HEIGHT * 0.5} x2={chartPlotWidth} y2={CHART_HEIGHT * 0.5} stroke={COLORS.border} strokeWidth={1} strokeDasharray="4 5" />
-                <Line x1="0" y1={CHART_HEIGHT * 0.75} x2={chartPlotWidth} y2={CHART_HEIGHT * 0.75} stroke={COLORS.border} strokeWidth={1} strokeDasharray="4 5" />
+                <Line
+                  x1="0"
+                  y1={CHART_HEIGHT * 0.25}
+                  x2={chartPlotWidth}
+                  y2={CHART_HEIGHT * 0.25}
+                  stroke={COLORS.border}
+                  strokeWidth={1}
+                  strokeDasharray="4 5"
+                />
+                <Line
+                  x1="0"
+                  y1={CHART_HEIGHT * 0.5}
+                  x2={chartPlotWidth}
+                  y2={CHART_HEIGHT * 0.5}
+                  stroke={COLORS.border}
+                  strokeWidth={1}
+                  strokeDasharray="4 5"
+                />
+                <Line
+                  x1="0"
+                  y1={CHART_HEIGHT * 0.75}
+                  x2={chartPlotWidth}
+                  y2={CHART_HEIGHT * 0.75}
+                  stroke={COLORS.border}
+                  strokeWidth={1}
+                  strokeDasharray="4 5"
+                />
 
-                {areaPath !== "" && <Path d={areaPath} fill="url(#areaFill)" stroke="none" />}
+                {areaPath !== "" && (
+                  <Path d={areaPath} fill="url(#areaFill)" stroke="none" />
+                )}
                 {linePath !== "" && (
-                  <Path d={linePath} stroke={COLORS.cold} strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  <Path
+                    d={linePath}
+                    stroke={COLORS.cold}
+                    strokeWidth={2.4}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 )}
                 {lastPoint && (
-                  <Circle cx={lastPoint.x} cy={lastPoint.y} r={5} fill={COLORS.cold} stroke="#FFFFFF" strokeWidth={2} />
+                  <Circle
+                    cx={lastPoint.x}
+                    cy={lastPoint.y}
+                    r={5}
+                    fill={COLORS.cold}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                  />
                 )}
               </Svg>
             )}
@@ -236,7 +296,9 @@ export default function DeviceDetailScreen() {
           <View style={styles.smallCard}>
             <View style={styles.rowCenter}>
               <IconDroplet size={16} color={COLORS.humidity} />
-              <Text style={[styles.cardLabel, { marginLeft: 6 }]}>HUMIDITÉ</Text>
+              <Text style={[styles.cardLabel, { marginLeft: 6 }]}>
+                HUMIDITÉ
+              </Text>
             </View>
             <Text style={[styles.smallValue, { color: COLORS.humidity }]}>
               {telemetry.h != null ? `${telemetry.h.toFixed(1)}%` : "--"}
@@ -245,10 +307,16 @@ export default function DeviceDetailScreen() {
           </View>
           <View style={styles.smallCard}>
             <View style={styles.rowCenter}>
-              <IconBulb size={16} color={ledOn ? COLORS.amber : COLORS.textMuted} filled={ledOn} />
+              <IconBulb
+                size={16}
+                color={ledOn ? COLORS.amber : COLORS.textMuted}
+                filled={ledOn}
+              />
               <Text style={[styles.cardLabel, { marginLeft: 6 }]}>LED</Text>
             </View>
-            <Text style={[styles.smallValue, ledOn ? styles.ledOn : styles.ledOff]}>
+            <Text
+              style={[styles.smallValue, ledOn ? styles.ledOn : styles.ledOff]}
+            >
               {ledOn ? "ON" : "OFF"}
             </Text>
             <Text style={styles.unit}>
@@ -284,7 +352,12 @@ export default function DeviceDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
   container: { flexGrow: 1, padding: 24, paddingBottom: 120 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 6,
+  },
   rowCenter: { alignItems: "center", flexDirection: "row" },
   backBtn: {
     alignItems: "center",
@@ -296,14 +369,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40,
   },
-  eyebrow: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 1.5 },
-  title: { color: COLORS.textDark, fontSize: 22, fontWeight: "800", marginTop: 2 },
+  eyebrow: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+  },
+  title: {
+    color: COLORS.textDark,
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 2,
+  },
   statusPill: { alignItems: "center", flexDirection: "row", gap: 6 },
   statusDot: { borderRadius: 12, height: 10, width: 10 },
   online: { backgroundColor: COLORS.online },
   offline: { backgroundColor: COLORS.offline },
   statusText: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
-  activity: { color: COLORS.textMuted, fontSize: 12, marginBottom: 20, marginTop: 4 },
+  activity: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  alertBanner: {
+    backgroundColor: "#FDECEC",
+    borderColor: COLORS.danger,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 18,
+    padding: 14,
+  },
+  alertBannerTitle: { color: COLORS.danger, fontSize: 14, fontWeight: "800" },
+  alertBannerSubtitle: { color: COLORS.danger, fontSize: 12, marginTop: 4 },
   navRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
   navBtn: {
     alignItems: "center",
@@ -325,10 +423,24 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     padding: 20,
   },
-  chartHeader: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between" },
-  chartTitle: { color: COLORS.textDark, fontSize: 16, fontWeight: "800", marginTop: 2 },
+  chartHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  chartTitle: {
+    color: COLORS.textDark,
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 2,
+  },
   chartCurrentValue: { color: COLORS.cold, fontSize: 24, fontWeight: "800" },
-  chartArea: { height: CHART_HEIGHT, marginTop: 18, overflow: "hidden", position: "relative" },
+  chartArea: {
+    height: CHART_HEIGHT,
+    marginTop: 18,
+    overflow: "hidden",
+    position: "relative",
+  },
   chartSvg: { position: "absolute" },
   chartEmpty: {
     color: COLORS.textMuted,
@@ -338,7 +450,11 @@ const styles = StyleSheet.create({
     top: 66,
     width: "100%",
   },
-  chartAxis: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  chartAxis: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
   chartAxisLabel: { color: COLORS.textMuted, fontSize: 11 },
   sensorCard: {
     backgroundColor: COLORS.hero,
@@ -361,8 +477,19 @@ const styles = StyleSheet.create({
     marginTop: -48,
     width: 8,
   },
-  cardLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 1.2 },
-  mainValue: { color: COLORS.textDark, fontSize: 66, fontWeight: "800", marginLeft: 10, marginTop: 14 },
+  cardLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+  },
+  mainValue: {
+    color: COLORS.textDark,
+    fontSize: 66,
+    fontWeight: "800",
+    marginLeft: 10,
+    marginTop: 14,
+  },
   unit: { color: COLORS.textMuted, fontSize: 14, marginTop: 4 },
   row: { flexDirection: "row", gap: 14, marginTop: 14 },
   smallCard: {
@@ -374,10 +501,20 @@ const styles = StyleSheet.create({
     minHeight: 145,
     padding: 18,
   },
-  smallValue: { color: COLORS.textDark, fontSize: 30, fontWeight: "800", marginTop: 20 },
+  smallValue: {
+    color: COLORS.textDark,
+    fontSize: 30,
+    fontWeight: "800",
+    marginTop: 20,
+  },
   ledOn: { color: COLORS.amber },
   ledOff: { color: COLORS.textMuted },
-  error: { color: COLORS.danger, fontSize: 14, marginTop: 20, textAlign: "center" },
+  error: {
+    color: COLORS.danger,
+    fontSize: 14,
+    marginTop: 20,
+    textAlign: "center",
+  },
   fab: {
     alignItems: "center",
     backgroundColor: COLORS.textDark,

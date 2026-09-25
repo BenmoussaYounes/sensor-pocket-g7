@@ -21,6 +21,7 @@ import {
   IconThermometer,
 } from "../../components/fridge-icons";
 import { useSensorStore } from "../../store/useSensorStore";
+import { DeviceSelector } from "../../components/device-selector";
 import { HistoricalMeasurement } from "../../api/telemetryApi";
 
 type Metric = "t" | "h";
@@ -133,8 +134,8 @@ export default function DeviceHistoryScreen() {
           <IconChevronLeft />
           <Text style={styles.backText}>Retour</Text>
         </Pressable>
-        <View>
-          <Text style={styles.eyebrow}>{deviceId}</Text>
+        <View style={{ flex: 1 }}>
+          <DeviceSelector deviceId={deviceId} route="/device-history/[deviceId]" />
           <Text style={styles.title}>Historique</Text>
         </View>
       </View>
