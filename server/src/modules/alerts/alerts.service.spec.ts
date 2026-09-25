@@ -46,7 +46,7 @@ describe('AlertsService', () => {
     jest.useRealTimers();
   });
 
-  it('stops the alert after a normal reading persists for the hold timeout', () => {
+  it('stops the alert immediately after a normal reading', () => {
     jest.useFakeTimers();
 
     const setLed = jest.fn();
@@ -80,7 +80,6 @@ describe('AlertsService', () => {
     );
 
     expect(setLed).toHaveBeenCalledWith('frigo-01', true);
-    jest.advanceTimersByTime(60_001);
     expect(setLed).toHaveBeenCalledWith('frigo-01', false);
 
     jest.useRealTimers();

@@ -82,17 +82,8 @@ export class AlertsService implements OnModuleInit {
     this.clearBreachTimer(deviceId);
 
     if (state.alertActive) {
-      if (!state.recoveryTimer) {
-        state.recoveryTimer = setTimeout(() => {
-          this.stopAlert(deviceId);
-          state.recoveryTimer = undefined;
-        }, thresholds.holdMinutes * 60_000);
-
-        this.eventsService.record(deviceId, 'threshold_recovery_pending', {
-          deviceId,
-          holdMinutes: thresholds.holdMinutes,
-        });
-      }
+      this.clearRecoveryTimer(deviceId);
+      this.stopAlert(deviceId);
     }
   }
 
