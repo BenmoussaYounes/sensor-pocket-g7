@@ -7,6 +7,7 @@ import { LedModule } from './modules/led/led.module';
 import { MeasurementsModule } from './modules/measurements/measurements.module';
 import { MqttModule } from './modules/mqtt/mqtt.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { ThresholdsModule } from './modules/thresholds/thresholds.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module';
     LedModule,
     TelemetryModule,
     MeasurementsModule,
+    ThresholdsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

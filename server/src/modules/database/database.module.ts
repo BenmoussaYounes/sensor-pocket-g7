@@ -62,6 +62,20 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
             status        TEXT NOT NULL,
             last_activity INTEGER NOT NULL
           );
+
+          CREATE TABLE IF NOT EXISTS thresholds (
+            device      TEXT PRIMARY KEY,
+            tMin        REAL NOT NULL,
+            tMax        REAL NOT NULL,
+            hMin        REAL NOT NULL,
+            hMax        REAL NOT NULL,
+            holdMinutes INTEGER NOT NULL,
+            updated_at  INTEGER NOT NULL,
+            FOREIGN KEY(device) REFERENCES devices(id) ON DELETE CASCADE,
+            CHECK (tMin < tMax),
+            CHECK (hMin < hMax),
+            CHECK (holdMinutes >= 0)
+          );
         `);
 
         logger.log(`Base SQLite prête (${dbPath})`);
