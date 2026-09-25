@@ -36,7 +36,7 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
           CREATE TABLE IF NOT EXISTS measurements (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             device      TEXT    NOT NULL,
-            seq         INTEGER,
+            seq         INTEGER NOT NULL,
             ts          INTEGER NOT NULL,
             received_at INTEGER NOT NULL,
             t           REAL    NOT NULL,

@@ -10,7 +10,7 @@ export interface TelemetryMessage {
   ts: number;
   t: number;
   h?: number;
-  seq?: number;
+  seq: number;
 }
 
 type TelemetryListener = (topic: string, telemetry: TelemetryMessage) => void;
@@ -145,6 +145,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       Number.isFinite(message.ts) &&
       typeof message.t === 'number' &&
       Number.isFinite(message.t) &&
+      typeof message.seq === 'number' &&
+      Number.isInteger(message.seq) &&
+      message.seq >= 0 &&
       (message.h === undefined ||
         (typeof message.h === 'number' && Number.isFinite(message.h)))
     );
