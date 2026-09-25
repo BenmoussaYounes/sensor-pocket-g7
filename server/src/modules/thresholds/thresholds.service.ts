@@ -54,6 +54,13 @@ export class ThresholdsService {
       .all() as ThresholdRow[];
   }
 
+  deleteForDevice(deviceId: string): boolean {
+    const result = this.db
+      .prepare('DELETE FROM thresholds WHERE device = ?')
+      .run(deviceId);
+    return result.changes > 0;
+  }
+
   upsertForDevice(deviceId: string, values: ThresholdInput): ThresholdRow {
     this.validate(values);
 
