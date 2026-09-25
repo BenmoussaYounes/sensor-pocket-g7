@@ -10,21 +10,32 @@ export interface TelemetryMessage {
   ts: number;
   t: number;
   h?: number;
-  seq?: number;
+  seq: number;
+}
+
+export interface DeviceStatusMessage {
+  status: string;
 }
 
 type TelemetryListener = (topic: string, telemetry: TelemetryMessage) => void;
+type StatusListener = (topic: string, status: DeviceStatusMessage) => void;
 
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private readonly telemetryListeners = new Set<TelemetryListener>();
+  private readonly statusListeners = new Set<StatusListener>();
   private client?: MqttClient;
   private group?: string;
 
   onTelemetry(listener: TelemetryListener): () => void {
     this.telemetryListeners.add(listener);
     return () => this.telemetryListeners.delete(listener);
+  }
+
+  onStatus(listener: StatusListener): () => void {
+    this.statusListeners.add(listener);
+    return () => this.statusListeners.delete(listener);
   }
 
   onModuleInit(): void {
@@ -105,7 +116,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
   private handleMessage(topic: string, rawPayload: string): void {
     if (topic.endsWith('/status')) {
-      this.logger.log(`Statut reçu sur ${topic} : ${rawPayload.trim()}`);
+      const status = this.parseStatus(rawPayload);
+      if (!status) {
+        this.logger.warn(`Statut MQTT invalide sur ${topic}`);
+        return;
+      }
+
+      this.logger.log(`Statut reçu sur ${topic} : ${status.status}`);
+      this.statusListeners.forEach((listener) => listener(topic, status));
       return;
     }
 
@@ -131,7 +149,31 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       this.telemetryListeners.forEach((listener) => listener(topic, payload));
       return;
     }
+  }
 
+  private parseStatus(rawPayload: string): DeviceStatusMessage | undefined {
+    const value = rawPayload.trim();
+    if (!value) {
+      return undefined;
+    }
+
+    try {
+      const payload: unknown = JSON.parse(value);
+      if (
+        typeof payload === 'object' &&
+        payload !== null &&
+        typeof (payload as Record<string, unknown>).status === 'string'
+      ) {
+        return { status: (payload as Record<string, string>).status };
+      }
+      if (typeof payload === 'string' && payload.trim()) {
+        return { status: payload.trim() };
+      }
+    } catch {
+      return { status: value };
+    }
+
+    return undefined;
   }
 
   private isTelemetry(payload: unknown): payload is TelemetryMessage {
@@ -145,6 +187,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       Number.isFinite(message.ts) &&
       typeof message.t === 'number' &&
       Number.isFinite(message.t) &&
+      typeof message.seq === 'number' &&
+      Number.isInteger(message.seq) &&
+      message.seq >= 0 &&
       (message.h === undefined ||
         (typeof message.h === 'number' && Number.isFinite(message.h)))
     );

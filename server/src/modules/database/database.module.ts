@@ -36,7 +36,7 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
           CREATE TABLE IF NOT EXISTS measurements (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             device      TEXT    NOT NULL,
-            seq         INTEGER,
+            seq         INTEGER NOT NULL,
             ts          INTEGER NOT NULL,
             received_at INTEGER NOT NULL,
             t           REAL    NOT NULL,
@@ -55,6 +55,13 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
           -- mélangées sur la plage de dates).
           CREATE INDEX IF NOT EXISTS idx_measurements_device_ts
             ON measurements (device, ts);
+
+          CREATE TABLE IF NOT EXISTS devices (
+            id            TEXT PRIMARY KEY,
+            groupe        TEXT NOT NULL,
+            status        TEXT NOT NULL,
+            last_activity INTEGER NOT NULL
+          );
         `);
 
         logger.log(`Base SQLite prête (${dbPath})`);

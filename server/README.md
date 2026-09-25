@@ -39,8 +39,12 @@ identifiants du broker. Au démarrage, le serveur écoute :
 - `sentinelle/<MQTT_GROUP>/+/telemetry`
 - `sentinelle/<MQTT_GROUP>/+/status`
 
-Les messages `telemetry` attendent au minimum `{ "ts": 123, "t": 22.2 }`.
+Les messages `telemetry` attendent au minimum `{ "ts": 123, "t": 22.2, "seq": 12 }`.
 Les messages invalides sont ignorés et ne font pas tomber le serveur.
+
+Les statuts peuvent être envoyés sur `sentinelle/<MQTT_GROUP>/<device>/status`
+avec `{ "status": "online" }` ou comme texte simple (`online`). L'état courant
+est consultable via `GET /devices` et `GET /devices/{deviceId}`.
 
 ## WebSocket télémétrie
 

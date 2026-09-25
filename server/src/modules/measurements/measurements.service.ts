@@ -6,7 +6,7 @@ import { MqttService, TelemetryMessage } from '../mqtt/mqtt.service';
 export interface MeasurementRow {
   id: number;
   device: string;
-  seq: number | null;
+  seq: number;
   ts: number;
   received_at: number;
   t: number;
@@ -48,7 +48,7 @@ export class MeasurementsService implements OnModuleInit {
     try {
       this.insertStmt.run({
         device: deviceId,
-        seq: telemetry.seq ?? null,
+        seq: telemetry.seq,
         ts: telemetry.ts,
         received_at: Date.now(),
         t: telemetry.t,
