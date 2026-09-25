@@ -76,6 +76,20 @@ export const SQLITE_CONNECTION = 'SQLITE_CONNECTION';
             CHECK (hMin < hMax),
             CHECK (holdMinutes >= 0)
           );
+
+          CREATE TABLE IF NOT EXISTS events (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            device    TEXT NOT NULL,
+            ts        INTEGER NOT NULL,
+            type      TEXT NOT NULL,
+            content   TEXT NOT NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_events_device_ts
+            ON events (device, ts);
+
+          CREATE INDEX IF NOT EXISTS idx_events_type_ts
+            ON events (type, ts);
         `);
 
         logger.log(`Base SQLite prête (${dbPath})`);
