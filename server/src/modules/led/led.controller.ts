@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   ServiceUnavailableException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -17,6 +18,8 @@ import {
 } from '@nestjs/swagger';
 import { EventsService } from '../events/events.service';
 import { MqttService } from '../mqtt/mqtt.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RouteRateLimit, RouteRateLimitGuard } from '../auth/rate-limit.guard';
 import { SetLedDto } from './dto/set-led.dto';
 
 @ApiTags('LED')
@@ -40,6 +43,8 @@ export class LedController {
   @ApiResponse({ status: 201, description: 'Commande LED envoyée' })
   @ApiBadRequestResponse({ description: 'Le champ on doit être booléen' })
   @ApiServiceUnavailableResponse({ description: 'MQTT est indisponible' })
+  @UseGuards(JwtAuthGuard, RouteRateLimitGuard)
+  @RouteRateLimit(10, 60_000)
   setLed(@Param('deviceId') deviceId: string, @Body() body: SetLedDto) {
     if (!deviceId.trim() || typeof body?.on !== 'boolean') {
       throw new BadRequestException(

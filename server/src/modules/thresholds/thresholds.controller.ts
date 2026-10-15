@@ -7,8 +7,11 @@ import {
   NotFoundException,
   Param,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RouteRateLimit, RouteRateLimitGuard } from '../auth/rate-limit.guard';
 import { ThresholdInput, ThresholdsService } from './thresholds.service';
 
 @ApiTags('Thresholds')
@@ -23,7 +26,7 @@ export class ThresholdsController {
   }
 
   @Get(':deviceId/thresholds')
-  @ApiOperation({ summary: "Seuils d’alerte d’un device" })
+  @ApiOperation({ summary: 'Seuils d’alerte d’un device' })
   @ApiParam({ name: 'deviceId', description: 'Identifiant du device' })
   getThresholds(@Param('deviceId') deviceId: string) {
     const threshold = this.thresholdsService.getForDevice(deviceId);
@@ -49,6 +52,8 @@ export class ThresholdsController {
       },
     },
   })
+  @UseGuards(JwtAuthGuard, RouteRateLimitGuard)
+  @RouteRateLimit(10, 60_000)
   setThresholds(
     @Param('deviceId') deviceId: string,
     @Body() body: Record<string, unknown>,
@@ -60,6 +65,8 @@ export class ThresholdsController {
   @Delete(':deviceId/thresholds')
   @ApiOperation({ summary: 'Supprimer les seuils d’un device' })
   @ApiParam({ name: 'deviceId', description: 'Identifiant du device' })
+  @UseGuards(JwtAuthGuard, RouteRateLimitGuard)
+  @RouteRateLimit(10, 60_000)
   deleteThresholds(@Param('deviceId') deviceId: string) {
     const deleted = this.thresholdsService.deleteForDevice(deviceId);
     if (!deleted) {
