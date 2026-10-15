@@ -1,4 +1,5 @@
 import { API_BASE_URL, checkConfig } from "./config";
+import { getAuthHeaders, handleUnauthorized } from "./authToken";
 
 export type Thresholds = {
   device: string;
@@ -48,16 +49,24 @@ export async function saveThresholds(
   values: ThresholdValues,
 ): Promise<Thresholds> {
   checkConfig();
+  const authHeaders = await getAuthHeaders();
 
   const response = await fetch(
     `${API_BASE_URL}/devices/${deviceId}/thresholds`,
     {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(values),
     },
   );
 
+  if (response.status === 401) {
+    await handleUnauthorized();
+    throw new Error("Session expirée, reconnecte-toi");
+  }
+  if (response.status === 429) {
+    throw new Error("Trop de modifications, patiente un instant");
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = Array.isArray(body?.message)

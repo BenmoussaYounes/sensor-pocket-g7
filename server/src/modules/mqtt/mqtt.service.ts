@@ -49,6 +49,17 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // TLS obligatoire : identifiant et mot de passe MQTT ne doivent jamais
+    // circuler en clair. mqtts:// (8883) ou wss:// (8884). Dérogation
+    // explicite et réservée au dev local : MQTT_ALLOW_INSECURE=true.
+    const usesTls = /^(mqtts|wss|ssl|tls):\/\//i.test(brokerUrl);
+    if (!usesTls && process.env.MQTT_ALLOW_INSECURE !== 'true') {
+      this.logger.error(
+        'MQTT désactivé : MQTT_URL doit commencer par mqtts:// (port 8883) ou wss:// (8884)',
+      );
+      return;
+    }
+
     this.group = group;
 
     const telemetryTopic = `sentinelle/${group}/+/telemetry`;
@@ -62,6 +73,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       password: process.env.MQTT_PASSWORD,
       clientId,
       reconnectPeriod: 5000,
+      // Vérifie la chaîne de certificats du broker (valeur par défaut, mais
+      // on l'écrit pour que ça ne puisse pas être désactivé par accident).
+      rejectUnauthorized: true,
     });
 
     this.client.on('connect', () => {

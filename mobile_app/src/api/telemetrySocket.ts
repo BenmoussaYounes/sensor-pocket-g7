@@ -1,4 +1,4 @@
-import { API_BASE_URL, checkConfig } from "./config";
+import { resolveWsBase } from "./config";
 
 // Le serveur diffuse maintenant la télémétrie de TOUS les frigos sur la même
 // connexion WebSocket (un seul flux global) : chaque message porte désormais
@@ -48,16 +48,16 @@ const MIN_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 15000;
 
 export function connectTelemetrySocket(callbacks: SocketCallbacks) {
+  let wsUrl: string;
   try {
-    checkConfig();
+    // Valide aussi la config : URL manquante, ou ws:// en production.
+    wsUrl = `${resolveWsBase()}/ws/telemetry`;
   } catch (err: any) {
-    // Erreur de configuration (URL API manquante) : pas la peine de boucler,
-    // ça ne se réparera pas tout seul.
+    // Erreur de configuration : pas la peine de boucler, ça ne se réparera
+    // pas tout seul.
     callbacks.onError(err.message);
     return () => {};
   }
-
-  const wsUrl = `${API_BASE_URL!.replace(/^http/, "ws")}/ws/telemetry`;
 
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,7 +101,10 @@ export function connectTelemetrySocket(callbacks: SocketCallbacks) {
         // Une enveloppe d'alerte porte un champ "event" ("alert_started" /
         // "alert_stopped") ; la télémétrie brute n'en a pas. C'est ce qui
         // permet de trier sur la même connexion sans changer d'endpoint.
-        if (parsed && (parsed.event === "alert_started" || parsed.event === "alert_stopped")) {
+        if (
+          parsed &&
+          (parsed.event === "alert_started" || parsed.event === "alert_stopped")
+        ) {
           callbacks.onAlert(parsed as AlertEvent);
         } else {
           callbacks.onMessage(parsed as Telemetry);

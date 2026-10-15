@@ -8,9 +8,43 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
 
+  const httpServer = app.getHttpAdapter().getInstance();
+  httpServer.disable('x-powered-by');
+  // Derrière un reverse proxy TLS (Caddy, nginx, ingress...), req.ip serait
+  // sinon l'adresse du proxy : le rate limit bloquerait tout le monde d'un
+  // coup. TRUST_PROXY=1 -> on fait confiance à X-Forwarded-For du 1er proxy.
+  if (process.env.TRUST_PROXY) {
+    const hops = Number(process.env.TRUST_PROXY);
+    httpServer.set('trust proxy', Number.isNaN(hops) ? process.env.TRUST_PROXY : hops);
+  }
+
+  // CORS strict : sans CORS_ORIGIN, aucune origine navigateur n'est autorisée.
+  // Liste explicite, jamais '*' (ex. CORS_ORIGIN=https://app.mondomaine.fr).
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (corsOrigin) {
+    const origins = corsOrigin
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    app.enableCors({
+      origin: origins,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+    });
+  }
+
+  // Swagger décrit toute la surface d'attaque : coupé en production sauf si
+  // ENABLE_SWAGGER=true.
+  const swaggerEnabled =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.ENABLE_SWAGGER === 'true';
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Serveur G7 API')
-    .setDescription(`
+    .setDescription(
+      `
 ## API HTTP
 
 L API permet de contrôler la LED d un device :
@@ -19,6 +53,9 @@ L API permet de contrôler la LED d un device :
 
 Corps de la requête : \`{ "on": true }\` pour allumer ou \`{ "on": false }\`
 pour éteindre.
+
+Les actions d'écriture (LED + seuils) exigent un JWT via
+\`Authorization: Bearer <token>\`.
 
 ## WebSocket télémétrie
 
@@ -37,12 +74,16 @@ Exemple de message reçu :
   "seq": 12
 }
 \`\`\`
-    `)
+    `,
+    )
     .setVersion('1.0')
     .addTag('LED', 'Contrôle des LEDs des devices')
+    .addBearerAuth()
     .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, swaggerDocument);
+  if (swaggerEnabled) {
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, swaggerDocument);
+  }
 
   await app.listen(process.env.PORT ?? 110, '0.0.0.0');
 }

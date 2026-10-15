@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './modules/auth/auth.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DevicesModule } from './modules/devices/devices.module';
@@ -13,6 +14,7 @@ import { ThresholdsModule } from './modules/thresholds/thresholds.module';
 
 @Module({
   imports: [
+    AuthModule,
     DatabaseModule,
     MqttModule,
     DevicesModule,

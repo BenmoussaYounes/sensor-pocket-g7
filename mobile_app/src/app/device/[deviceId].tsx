@@ -27,6 +27,7 @@ import {
   IconThermometer,
 } from "../../components/fridge-icons";
 import { useSensorStore } from "../../store/useSensorStore";
+import { useAuthStore } from "../../store/useAuthStore";
 import { DeviceSelector } from "../../components/device-selector";
 import { fetchDevice, DeviceSummary } from "../../api/devicesApi";
 import { formatAlertType, formatRelativeTime } from "../../utils/format";
@@ -49,6 +50,9 @@ export default function DeviceDetailScreen() {
     error,
     toggleLed,
   } = useSensorStore();
+
+  const signOut = useAuthStore((state) => state.signOut);
+  const authGroup = useAuthStore((state) => state.group);
 
   const [chartWidth, setChartWidth] = useState(0);
   const [fallbackDevice, setFallbackDevice] = useState<DeviceSummary | null>(
@@ -131,6 +135,16 @@ export default function DeviceDetailScreen() {
               {isOnline ? "En ligne" : "Hors ligne"}
             </Text>
           </View>
+          <Pressable
+            onPress={() => void signOut()}
+            accessibilityRole="button"
+            accessibilityLabel="Se déconnecter"
+            style={styles.logoutBtn}
+          >
+            <Text style={styles.logoutText}>
+              {authGroup ? `${authGroup} · Quitter` : "Quitter"}
+            </Text>
+          </Pressable>
         </View>
 
         <Text style={styles.activity}>
@@ -381,6 +395,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 2,
   },
+  logoutBtn: {
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  logoutText: { color: COLORS.textDark, fontSize: 11, fontWeight: "700" },
   statusPill: { alignItems: "center", flexDirection: "row", gap: 6 },
   statusDot: { borderRadius: 12, height: 10, width: 10 },
   online: { backgroundColor: COLORS.online },
