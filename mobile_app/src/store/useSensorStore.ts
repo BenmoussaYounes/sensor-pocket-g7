@@ -18,6 +18,7 @@ import {
   Thresholds,
   ThresholdValues,
 } from "../api/thresholdsApi";
+import { notifyFridgeAlert } from "../utils/notifications";
 
 export type TemperatureReading = {
   timestamp: number;
@@ -99,9 +100,9 @@ interface SensorState {
     values: ThresholdValues,
   ) => Promise<boolean>;
   loadHistory: (
-    deviceId: string,
-    fromTs: number,
-    toTs: number,
+    deviceIdOrFromTs: string | number,
+    fromTsOrToTs?: number,
+    maybeToTs?: number,
   ) => Promise<void>;
   setError: (error: string | null) => void;
 }
@@ -109,235 +110,277 @@ interface SensorState {
 export const useSensorStore = create<SensorState>()(
   persist(
     (set, get) => ({
-  connected: false,
-  socketError: null,
+      connected: false,
+      socketError: null,
 
-  devices: [],
-  devicesLoading: false,
-  devicesError: null,
+      devices: [],
+      devicesLoading: false,
+      devicesError: null,
 
-  telemetryByDevice: {},
-  readingsByDevice: {},
+      telemetryByDevice: {},
+      readingsByDevice: {},
 
-  ledByDevice: {},
-  ledLoadingByDevice: {},
+      ledByDevice: {},
+      ledLoadingByDevice: {},
 
-  thresholdsByDevice: {},
-  thresholdsLoading: false,
-  thresholdsError: null,
+      thresholdsByDevice: {},
+      thresholdsLoading: false,
+      thresholdsError: null,
 
-  activeAlertsByDevice: {},
-  alertHistory: [],
+      activeAlertsByDevice: {},
+      alertHistory: [],
 
-  history: [],
-  historyLoading: false,
-  error: null,
-
-  lastSyncedAt: null,
-  hasHydrated: false,
-  setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
-
-  setError: (error) => set({ error }),
-
-  initSocketConnection: () => {
-    if (socketAlreadyStarted) {
-      // Déjà connecté ailleurs (typiquement depuis _layout.tsx) : cet appel
-      // n'a rien à démarrer ni à couper.
-      return () => {};
-    }
-    socketAlreadyStarted = true;
-
-    const disconnect = connectTelemetrySocket({
-      onOpen: () => set({ connected: true, socketError: null }),
-      onClose: () =>
-        set((state) => ({
-          connected: false,
-          // Quand le flux WebSocket coupe, on bascule tous les équipements en "offline"
-          devices: state.devices.map((device) => ({
-            ...device,
-            status: "offline",
-          })),
-        })),
-      onError: (msg) => set({ socketError: msg }),
-      onMessage: (message) => {
-        const deviceId = message.deviceId;
-        if (!deviceId) {
-          // Message mal formé : on l'ignore plutôt que de faire planter
-          // l'affichage d'un frigo au hasard.
-          return;
-        }
-
-        const timestamp = Date.now();
-
-        set((state) => {
-          const nextTelemetryByDevice = {
-            ...state.telemetryByDevice,
-            [deviceId]: message,
-          };
-
-          // Un message reçu = le frigo est forcément en ligne : on met à
-          // jour le tableau de bord tout de suite, sans attendre le
-          // prochain rafraîchissement de GET /devices.
-          const nextDevices = state.devices.map((device) =>
-            device.id === deviceId
-              ? { ...device, status: "online", last_activity: timestamp }
-              : device,
-          );
-
-          if (typeof message.t !== "number" || !Number.isFinite(message.t)) {
-            return {
-              telemetryByDevice: nextTelemetryByDevice,
-              devices: nextDevices,
-              lastSyncedAt: timestamp,
-            };
-          }
-
-          const existingReadings = state.readingsByDevice[deviceId] ?? [];
-          const filtered = existingReadings.filter(
-            (reading) => reading.timestamp >= timestamp - TEN_MINUTES_MS,
-          );
-          filtered.push({ timestamp, value: message.t });
-
-          return {
-            telemetryByDevice: nextTelemetryByDevice,
-            devices: nextDevices,
-            lastSyncedAt: timestamp,
-            readingsByDevice: {
-              ...state.readingsByDevice,
-              [deviceId]: filtered,
-            },
-          };
-        });
-      },
-      onAlert: (alert: AlertEvent) => {
-        const deviceId = alert.data.deviceId;
-        if (!deviceId) return;
-
-        if (alert.event === "alert_started") {
-          const { type, holdMinutes } = alert.data;
-          set((state) => ({
-            activeAlertsByDevice: {
-              ...state.activeAlertsByDevice,
-              [deviceId]: { type, holdMinutes, startedAt: Date.now() },
-            },
-            lastSyncedAt: Date.now(),
-          }));
-          return;
-        }
-
-        // alert_stopped : on referme l'alerte active (si on l'avait bien
-        // vue démarrer) et on l'archive dans le petit historique local.
-        const { reason } = alert.data;
-        set((state) => {
-          const current = state.activeAlertsByDevice[deviceId];
-          const remaining = { ...state.activeAlertsByDevice };
-          delete remaining[deviceId];
-
-          const entry: AlertHistoryEntry = {
-            deviceId,
-            type: current?.type ?? "unknown",
-            holdMinutes: current?.holdMinutes ?? 0,
-            startedAt: current?.startedAt ?? Date.now(),
-            stoppedAt: Date.now(),
-            reason,
-          };
-
-          return {
-            activeAlertsByDevice: remaining,
-            alertHistory: [entry, ...state.alertHistory].slice(
-              0,
-              MAX_ALERT_HISTORY,
-            ),
-            lastSyncedAt: Date.now(),
-          };
-        });
-      },
-    });
-
-    return () => {
-      socketAlreadyStarted = false;
-      disconnect();
-    };
-  },
-
-  loadDevices: async () => {
-    set({ devicesLoading: true, devicesError: null });
-    try {
-      const data = await fetchDevices();
-      set({ devices: data, lastSyncedAt: Date.now() });
-    } catch (err: any) {
-      set({ devicesError: err.message || "Impossible de charger les frigos" });
-    } finally {
-      set({ devicesLoading: false });
-    }
-  },
-
-  toggleLed: async (deviceId: string) => {
-    const current = get().ledByDevice[deviceId] ?? false;
-    set((state) => ({
-      ledLoadingByDevice: { ...state.ledLoadingByDevice, [deviceId]: true },
+      history: [],
+      historyLoading: false,
       error: null,
-    }));
 
-    try {
-      const newState = await setLedState(deviceId, !current);
-      set((state) => ({
-        ledByDevice: { ...state.ledByDevice, [deviceId]: newState },
-      }));
-    } catch (err: any) {
-      set({ error: err.message || "Impossible de modifier la LED" });
-    } finally {
-      set((state) => ({
-        ledLoadingByDevice: { ...state.ledLoadingByDevice, [deviceId]: false },
-      }));
-    }
-  },
+      lastSyncedAt: null,
+      hasHydrated: false,
+      setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
 
-  loadThresholds: async (deviceId: string) => {
-    set({ thresholdsLoading: true, thresholdsError: null });
-    try {
-      const data = await fetchThresholds(deviceId);
-      set((state) => ({
-        thresholdsByDevice: { ...state.thresholdsByDevice, [deviceId]: data },
-      }));
-    } catch (err: any) {
-      set({
-        thresholdsError: err.message || "Impossible de charger les seuils",
-      });
-    } finally {
-      set({ thresholdsLoading: false });
-    }
-  },
+      setError: (error) => set({ error }),
 
-  saveThresholds: async (deviceId: string, values: ThresholdValues) => {
-    set({ thresholdsLoading: true, thresholdsError: null });
-    try {
-      const data = await saveThresholdsApi(deviceId, values);
-      set((state) => ({
-        thresholdsByDevice: { ...state.thresholdsByDevice, [deviceId]: data },
-      }));
-      return true;
-    } catch (err: any) {
-      set({
-        thresholdsError: err.message || "Seuils refusés",
-      });
-      return false;
-    } finally {
-      set({ thresholdsLoading: false });
-    }
-  },
+      initSocketConnection: () => {
+        if (socketAlreadyStarted) {
+          // Déjà connecté ailleurs (typiquement depuis _layout.tsx) : cet appel
+          // n'a rien à démarrer ni à couper.
+          return () => {};
+        }
+        socketAlreadyStarted = true;
 
-  loadHistory: async (deviceId: string, fromTs: number, toTs: number) => {
-    set({ historyLoading: true, error: null });
-    try {
-      const data = await fetchMeasurementHistory(deviceId, fromTs, toTs);
-      set({ history: data });
-    } catch (err: any) {
-      set({ error: err.message || "Erreur chargement historique" });
-    } finally {
-      set({ historyLoading: false });
-    }
-  },
+        const disconnect = connectTelemetrySocket({
+          onOpen: () => set({ connected: true, socketError: null }),
+          onClose: () =>
+            set((state) => ({
+              connected: false,
+              // Quand le flux WebSocket coupe, on bascule tous les équipements en "offline"
+              devices: state.devices.map((device) => ({
+                ...device,
+                status: "offline",
+              })),
+            })),
+          onError: (msg) => set({ socketError: msg }),
+          onMessage: (message) => {
+            const deviceId = message.deviceId;
+            if (!deviceId) {
+              // Message mal formé : on l'ignore plutôt que de faire planter
+              // l'affichage d'un frigo au hasard.
+              return;
+            }
+
+            const timestamp = Date.now();
+
+            set((state) => {
+              const nextTelemetryByDevice = {
+                ...state.telemetryByDevice,
+                [deviceId]: message,
+              };
+
+              // Un message reçu = le frigo est forcément en ligne : on met à
+              // jour le tableau de bord tout de suite, sans attendre le
+              // prochain rafraîchissement de GET /devices.
+              const nextDevices = state.devices.map((device) =>
+                device.id === deviceId
+                  ? { ...device, status: "online", last_activity: timestamp }
+                  : device,
+              );
+
+              if (
+                typeof message.t !== "number" ||
+                !Number.isFinite(message.t)
+              ) {
+                return {
+                  telemetryByDevice: nextTelemetryByDevice,
+                  devices: nextDevices,
+                  lastSyncedAt: timestamp,
+                };
+              }
+
+              const existingReadings = state.readingsByDevice[deviceId] ?? [];
+              const filtered = existingReadings.filter(
+                (reading) => reading.timestamp >= timestamp - TEN_MINUTES_MS,
+              );
+              filtered.push({ timestamp, value: message.t });
+
+              return {
+                telemetryByDevice: nextTelemetryByDevice,
+                devices: nextDevices,
+                lastSyncedAt: timestamp,
+                readingsByDevice: {
+                  ...state.readingsByDevice,
+                  [deviceId]: filtered,
+                },
+              };
+            });
+          },
+          onAlert: (alert: AlertEvent) => {
+            const deviceId = alert.data.deviceId;
+            if (!deviceId) return;
+
+            if (alert.event === "alert_started") {
+              const { type, holdMinutes } = alert.data;
+
+              set((state) => ({
+                activeAlertsByDevice: {
+                  ...state.activeAlertsByDevice,
+                  [deviceId]: {
+                    type,
+                    holdMinutes,
+                    startedAt: Date.now(),
+                  },
+                },
+                lastSyncedAt: Date.now(),
+              }));
+
+              void notifyFridgeAlert(deviceId, type, holdMinutes);
+              return;
+            }
+
+            const { reason } = alert.data;
+            set((state) => {
+              const current = state.activeAlertsByDevice[deviceId];
+              const remaining = { ...state.activeAlertsByDevice };
+              delete remaining[deviceId];
+
+              const entry: AlertHistoryEntry = {
+                deviceId,
+                type: current?.type ?? "unknown",
+                holdMinutes: current?.holdMinutes ?? 0,
+                startedAt: current?.startedAt ?? Date.now(),
+                stoppedAt: Date.now(),
+                reason,
+              };
+
+              return {
+                activeAlertsByDevice: remaining,
+                alertHistory: [entry, ...state.alertHistory].slice(
+                  0,
+                  MAX_ALERT_HISTORY,
+                ),
+                lastSyncedAt: Date.now(),
+              };
+            });
+          },
+        });
+
+        return () => {
+          socketAlreadyStarted = false;
+          disconnect();
+        };
+      },
+
+      loadDevices: async () => {
+        set({ devicesLoading: true, devicesError: null });
+        try {
+          const data = await fetchDevices();
+          set({ devices: data, lastSyncedAt: Date.now() });
+        } catch (err: any) {
+          set({
+            devicesError: err.message || "Impossible de charger les frigos",
+          });
+        } finally {
+          set({ devicesLoading: false });
+        }
+      },
+
+      toggleLed: async (deviceId: string) => {
+        const current = get().ledByDevice[deviceId] ?? false;
+        set((state) => ({
+          ledLoadingByDevice: { ...state.ledLoadingByDevice, [deviceId]: true },
+          error: null,
+        }));
+
+        try {
+          const newState = await setLedState(deviceId, !current);
+          set((state) => ({
+            ledByDevice: { ...state.ledByDevice, [deviceId]: newState },
+          }));
+        } catch (err: any) {
+          set({ error: err.message || "Impossible de modifier la LED" });
+        } finally {
+          set((state) => ({
+            ledLoadingByDevice: {
+              ...state.ledLoadingByDevice,
+              [deviceId]: false,
+            },
+          }));
+        }
+      },
+
+      loadThresholds: async (deviceId: string) => {
+        set({ thresholdsLoading: true, thresholdsError: null });
+        try {
+          const data = await fetchThresholds(deviceId);
+          set((state) => ({
+            thresholdsByDevice: {
+              ...state.thresholdsByDevice,
+              [deviceId]: data,
+            },
+          }));
+        } catch (err: any) {
+          set({
+            thresholdsError: err.message || "Impossible de charger les seuils",
+          });
+        } finally {
+          set({ thresholdsLoading: false });
+        }
+      },
+
+      saveThresholds: async (deviceId: string, values: ThresholdValues) => {
+        set({ thresholdsLoading: true, thresholdsError: null });
+        try {
+          const data = await saveThresholdsApi(deviceId, values);
+          set((state) => ({
+            thresholdsByDevice: {
+              ...state.thresholdsByDevice,
+              [deviceId]: data,
+            },
+          }));
+          return true;
+        } catch (err: any) {
+          set({
+            thresholdsError: err.message || "Seuils refusés",
+          });
+          return false;
+        } finally {
+          set({ thresholdsLoading: false });
+        }
+      },
+
+      loadHistory: async (
+        deviceIdOrFromTs: string | number,
+        fromTsOrToTs?: number,
+        maybeToTs?: number,
+      ) => {
+        const deviceId =
+          typeof deviceIdOrFromTs === "string"
+            ? deviceIdOrFromTs
+            : get().devices[0]?.id;
+
+        if (!deviceId) {
+          set({ error: "Aucun frigo disponible pour l'historique" });
+          return;
+        }
+
+        const fromTs =
+          typeof deviceIdOrFromTs === "string"
+            ? (fromTsOrToTs ?? 0)
+            : deviceIdOrFromTs;
+        const toTs =
+          typeof deviceIdOrFromTs === "string"
+            ? (maybeToTs ?? Date.now())
+            : (fromTsOrToTs ?? Date.now());
+
+        set({ historyLoading: true, error: null });
+        try {
+          const data = await fetchMeasurementHistory(deviceId, fromTs, toTs);
+          set({ history: data });
+        } catch (err: any) {
+          set({ error: err.message || "Erreur chargement historique" });
+        } finally {
+          set({ historyLoading: false });
+        }
+      },
     }),
     {
       name: "sensor-store-cache",
