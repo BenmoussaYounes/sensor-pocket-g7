@@ -34,10 +34,20 @@ export type AlertStoppedEvent = {
 
 export type AlertEvent = AlertStartedEvent | AlertStoppedEvent;
 
+// Envoyé par le backend à chaque (re)connexion : liste COMPLÈTE des alertes
+// réellement en cours. C'est la source de vérité pour resynchroniser l'app.
+export type AlertsSnapshotEvent = {
+  event: "alerts_snapshot";
+  data: {
+    alerts: { deviceId: string; type: string; holdMinutes: number }[];
+  };
+};
+
 type SocketCallbacks = {
   onOpen: () => void;
   onMessage: (data: Telemetry) => void;
   onAlert: (alert: AlertEvent) => void;
+  onAlertsSnapshot: (snapshot: AlertsSnapshotEvent) => void;
   onError: (error: string) => void;
   onClose: () => void;
 };
@@ -101,7 +111,9 @@ export function connectTelemetrySocket(callbacks: SocketCallbacks) {
         // Une enveloppe d'alerte porte un champ "event" ("alert_started" /
         // "alert_stopped") ; la télémétrie brute n'en a pas. C'est ce qui
         // permet de trier sur la même connexion sans changer d'endpoint.
-        if (
+        if (parsed && parsed.event === "alerts_snapshot") {
+          callbacks.onAlertsSnapshot(parsed as AlertsSnapshotEvent);
+        } else if (
           parsed &&
           (parsed.event === "alert_started" || parsed.event === "alert_stopped")
         ) {

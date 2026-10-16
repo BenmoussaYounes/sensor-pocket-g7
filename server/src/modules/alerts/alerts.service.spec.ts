@@ -84,4 +84,48 @@ describe('AlertsService', () => {
 
     jest.useRealTimers();
   });
+  it('notifies alert_stopped and exposes active alerts correctly when thresholds are removed', () => {
+    jest.useFakeTimers();
+
+    const setLed = jest.fn();
+    const telemetryListeners = new Set<(topic: string, telemetry: any) => void>();
+    const mqttService = {
+      onTelemetry: jest.fn((listener) => {
+        telemetryListeners.add(listener);
+        return () => telemetryListeners.delete(listener);
+      }),
+      setLed,
+    } as any;
+
+    let current: typeof thresholds | undefined = thresholds;
+    const thresholdsService = {
+      getForDevice: jest.fn(() => current),
+    } as any;
+    const eventsService = { record: jest.fn() } as any;
+
+    const service = new AlertsService(mqttService, thresholdsService, eventsService);
+    const notifications: any[] = [];
+    service.onAlert((n) => notifications.push(n));
+    service.onModuleInit();
+
+    const send = (t: number, seq: number) =>
+      telemetryListeners.forEach((l) =>
+        l('sentinelle/frigo/frigo-01/telemetry', { ts: seq, t, h: 50, seq }),
+      );
+
+    send(12, 1);
+    jest.advanceTimersByTime(60_001);
+    expect(service.getActiveAlerts()).toEqual([
+      { deviceId: 'frigo-01', type: 'temperature_or_humidity_threshold', holdMinutes: 1 },
+    ]);
+
+    current = undefined; // seuils supprimés pendant l'alerte
+    send(5, 2);
+
+    expect(service.getActiveAlerts()).toEqual([]);
+    expect(notifications.map((n) => n.event)).toEqual(['alert_started', 'alert_stopped']);
+    expect(notifications[1].data.reason).toBe('thresholds_removed');
+
+    jest.useRealTimers();
+  });
 });

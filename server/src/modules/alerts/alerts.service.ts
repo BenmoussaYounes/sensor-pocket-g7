@@ -8,7 +8,16 @@ type AlertState = {
   recoveryTimer?: NodeJS.Timeout;
   blinkInterval?: NodeJS.Timeout;
   alertActive: boolean;
+  holdMinutes?: number;
 };
+
+export type ActiveAlert = {
+  deviceId: string;
+  type: string;
+  holdMinutes: number;
+};
+
+const ALERT_TYPE = 'temperature_or_humidity_threshold';
 
 export type AlertNotification = {
   event: 'alert_started' | 'alert_stopped';
@@ -47,9 +56,31 @@ export class AlertsService implements OnModuleInit {
     return () => this.alertListeners.delete(listener);
   }
 
+  /**
+   * Alertes actuellement en cours. Envoyé à chaque nouveau client WebSocket :
+   * l'évènement "alert_stopped" n'est diffusé qu'une fois, un client déconnecté
+   * à ce moment-là ne le recevrait jamais et garderait l'alerte affichée.
+   */
+  getActiveAlerts(): ActiveAlert[] {
+    const active: ActiveAlert[] = [];
+    this.alertStates.forEach((state, deviceId) => {
+      if (state.alertActive) {
+        active.push({
+          deviceId,
+          type: ALERT_TYPE,
+          holdMinutes: state.holdMinutes ?? 0,
+        });
+      }
+    });
+    return active;
+  }
+
   private handleTelemetry(deviceId: string, telemetry: TelemetryMessage): void {
     const thresholds = this.thresholdsService.getForDevice(deviceId);
     if (!thresholds) {
+      // Seuils supprimés pendant une alerte : il faut aussi prévenir les
+      // clients, sinon l'alerte reste affichée indéfiniment côté app.
+      this.stopAlert(deviceId, 'thresholds_removed');
       this.clearTimers(deviceId);
       return;
     }
@@ -94,13 +125,14 @@ export class AlertsService implements OnModuleInit {
     }
 
     state.alertActive = true;
+    state.holdMinutes = thresholds.holdMinutes;
     this.logger.warn(
       `Alerte démarrée pour ${deviceId} : température ou humidité hors seuil pendant ${thresholds.holdMinutes} min`,
     );
 
     this.eventsService.record(deviceId, 'alert_started', {
       deviceId,
-      type: 'temperature_or_humidity_threshold',
+      type: ALERT_TYPE,
       holdMinutes: thresholds.holdMinutes,
       thresholds,
     });
@@ -108,7 +140,7 @@ export class AlertsService implements OnModuleInit {
       event: 'alert_started',
       data: {
         deviceId,
-        type: 'temperature_or_humidity_threshold',
+        type: ALERT_TYPE,
         holdMinutes: thresholds.holdMinutes,
         thresholds,
       },
@@ -127,7 +159,10 @@ export class AlertsService implements OnModuleInit {
     }, 3000);
   }
 
-  private stopAlert(deviceId: string): void {
+  private stopAlert(
+    deviceId: string,
+    reason: string = 'threshold_normalized',
+  ): void {
     const state = this.getState(deviceId);
     if (!state.alertActive) {
       return;
@@ -142,13 +177,13 @@ export class AlertsService implements OnModuleInit {
     this.logger.log(`Alerte arrêtée pour ${deviceId}`);
     this.eventsService.record(deviceId, 'alert_stopped', {
       deviceId,
-      reason: 'threshold_normalized',
+      reason,
     });
     this.notifyAlert({
       event: 'alert_stopped',
       data: {
         deviceId,
-        reason: 'threshold_normalized',
+        reason,
       },
     });
 

@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   AlertEvent,
+  AlertsSnapshotEvent,
   connectTelemetrySocket,
   Telemetry,
 } from "../api/telemetrySocket";
@@ -213,6 +214,46 @@ export const useSensorStore = create<SensorState>()(
               };
             });
           },
+          onAlertsSnapshot: (snapshot: AlertsSnapshotEvent) => {
+            // Le serveur donne la liste exacte des alertes en cours : on
+            // remplace tout. Une alerte qu'on affichait mais qui n'y figure
+            // plus s'est terminée pendant qu'on était déconnecté.
+            const now = Date.now();
+            set((state) => {
+              const next: Record<string, ActiveAlert> = {};
+              for (const item of snapshot.data.alerts) {
+                next[item.deviceId] = state.activeAlertsByDevice[
+                  item.deviceId
+                ] ?? {
+                  type: item.type,
+                  holdMinutes: item.holdMinutes,
+                  startedAt: now,
+                };
+              }
+
+              const resolved: AlertHistoryEntry[] = Object.entries(
+                state.activeAlertsByDevice,
+              )
+                .filter(([deviceId]) => !next[deviceId])
+                .map(([deviceId, alert]) => ({
+                  deviceId,
+                  type: alert.type,
+                  holdMinutes: alert.holdMinutes,
+                  startedAt: alert.startedAt,
+                  stoppedAt: now,
+                  reason: "resolved_while_offline",
+                }));
+
+              return {
+                activeAlertsByDevice: next,
+                alertHistory: [...resolved, ...state.alertHistory].slice(
+                  0,
+                  MAX_ALERT_HISTORY,
+                ),
+                lastSyncedAt: now,
+              };
+            });
+          },
           onAlert: (alert: AlertEvent) => {
             const deviceId = alert.data.deviceId;
             if (!deviceId) return;
@@ -394,9 +435,19 @@ export const useSensorStore = create<SensorState>()(
         readingsByDevice: state.readingsByDevice,
         ledByDevice: state.ledByDevice,
         thresholdsByDevice: state.thresholdsByDevice,
-        activeAlertsByDevice: state.activeAlertsByDevice,
+        // activeAlertsByDevice n'est volontairement PAS persisté : c'est un
+        // état "en direct". Le relire depuis le disque réaffichait des
+        // alertes déjà terminées, sans moyen de les effacer.
         alertHistory: state.alertHistory,
         lastSyncedAt: state.lastSyncedAt,
+      }),
+      // Les anciennes versions de l'app avaient sauvegardé activeAlertsByDevice
+      // sur le disque : on l'ignore à la relecture pour purger ces alertes
+      // fantômes déjà stockées.
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<SensorState>),
+        activeAlertsByDevice: {},
       }),
       onRehydrateStorage: () => (state) => {
         // Signale à l'UI que la relecture du cache est terminée (que ça ait

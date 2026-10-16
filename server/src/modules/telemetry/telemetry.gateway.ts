@@ -45,8 +45,24 @@ export class TelemetryGateway
     this.unsubscribeAlerts?.();
   }
 
-  handleConnection(): void {
+  handleConnection(client: WebSocket): void {
     this.logger.log('Client WebSocket connecté pour la télémétrie');
+
+    // Resynchronisation : le client reçoit d'emblée l'état réel des alertes.
+    // Sans ça, un client qui s'est reconnecté après la fin d'une alerte (app
+    // fermée, réseau coupé...) afficherait une alerte périmée.
+    try {
+      client.send(
+        JSON.stringify({
+          event: 'alerts_snapshot',
+          data: { alerts: this.alertsService.getActiveAlerts() },
+        }),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Snapshot d'alertes non envoyé : ${error instanceof Error ? error.message : error}`,
+      );
+    }
   }
 
   private broadcastTelemetry(

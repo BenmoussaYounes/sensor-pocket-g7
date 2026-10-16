@@ -1,0 +1,22 @@
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.50:110" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.votre-domaine.fr",
+        "EXPO_PUBLIC_WS_BASE_URL": "wss://api.votre-domaine.fr"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.votre-domaine.fr",
+        "EXPO_PUBLIC_WS_BASE_URL": "wss://api.votre-domaine.fr"
+      }
+    }
+  }
+}

@@ -15,11 +15,13 @@ async function bootstrap() {
   // coup. TRUST_PROXY=1 -> on fait confiance à X-Forwarded-For du 1er proxy.
   if (process.env.TRUST_PROXY) {
     const hops = Number(process.env.TRUST_PROXY);
-    httpServer.set('trust proxy', Number.isNaN(hops) ? process.env.TRUST_PROXY : hops);
+    httpServer.set(
+      'trust proxy',
+      Number.isNaN(hops) ? process.env.TRUST_PROXY : hops,
+    );
   }
-
   // CORS strict : sans CORS_ORIGIN, aucune origine navigateur n'est autorisée.
-  // Liste explicite, jamais '*' (ex. CORS_ORIGIN=https://app.mondomaine.fr).
+  // Liste explicite, jamais '*'.
   const corsOrigin = process.env.CORS_ORIGIN;
   if (corsOrigin) {
     const origins = corsOrigin
@@ -29,12 +31,10 @@ async function bootstrap() {
 
     app.enableCors({
       origin: origins,
-      credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     });
   }
-
   // Swagger décrit toute la surface d'attaque : coupé en production sauf si
   // ENABLE_SWAGGER=true.
   const swaggerEnabled =
