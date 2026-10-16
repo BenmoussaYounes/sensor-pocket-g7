@@ -161,6 +161,37 @@ serveur est demarre :
 http://localhost:110/docs
 ```
 
+## CORS
+
+Une configuration CORS stricte a été mise en place sur le serveur NestJS,
+limitant les origines autorisées à l'URL de l'application en mode web :
+
+```ts
+app.enableCors({
+  origin: process.env.APP_ORIGIN,
+  methods: ['GET', 'POST', 'PUT'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+});
+```
+
+**Limite constatée** : CORS est une protection appliquée par le navigateur,
+qui vérifie l'en-tête `Origin` avant d'autoriser une page web à lire la
+réponse d'une requête cross-origin. L'application mobile (Expo compilé en
+APK/IPA) n'est pas un navigateur : ses requêtes HTTP natives (via OkHttp sur
+Android, URLSession sur iOS) ne sont pas soumises à cette politique. Un
+attaquant utilisant directement l'API (via `curl`, Postman, ou un APK
+modifié) contourne donc totalement cette protection.
+
+CORS reste configuré par principe et protégerait une éventuelle version web
+du projet (Expo web), mais **ce n'est pas la mesure qui sécurise l'accès au
+backend dans notre cas d'usage réel**. La protection effective contre les
+accès non autorisés repose sur :
+
+- l'authentification par JWT, obligatoire sur les routes de commande
+  (`POST /devices/{deviceId}/led`) ;
+- le rate limiting sur ces mêmes routes ;
+- le TLS/WSS sur l'ensemble des communications.
+
 ## Tests et qualite
 
 ```bash
